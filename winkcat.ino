@@ -1,6 +1,11 @@
 #include <Servo.h>
 
+#include <ESP8266mDNS.h>
 #include <ESP8266WiFi.h>
+#include <WiFiUdp.h>
+#include <WiFiClient.h>
+#include <ArduinoOTA.h>
+#include <PubSubClient.h>
 #include <PubSubClient.h>
 
 
@@ -11,13 +16,8 @@ Servo myservo;
 WiFiClient espClient;
 PubSubClient client(espClient);
 
-#define TIMEOUT_MS 60000
-
-unsigned long last_message = 0;
-
 void setup_wifi() {
 	delay(10);
-	// We start by connecting to a WiFi network
 	Serial.println();
 	Serial.print("Connecting to ");
 	Serial.println(ssid);
@@ -29,32 +29,50 @@ void setup_wifi() {
 		Serial.print(".");
 	}
 
-	Serial.println("");
+	Serial.println();
 	Serial.println("WiFi connected");
 	Serial.println("IP address: ");
 	Serial.println(WiFi.localIP());
+
+	ArduinoOTA.setHostname("maneki-neko");
+	ArduinoOTA.setPassword("miauw");
+
+	ArduinoOTA.onStart([]() {
+		Serial.println("Start");
+	});
+
+	ArduinoOTA.onEnd([]() {
+		Serial.println("\nEnd");
+		ESP.restart();
+	});
+
+	ArduinoOTA.onProgress([](unsigned int progress, unsigned int total) {
+		Serial.printf("Progress: %u%%\r", (progress / (total / 100)));
+	});
+
+	ArduinoOTA.onError([](ota_error_t error) {
+		Serial.printf("Error[%u]: ", error);
+		if (error == OTA_AUTH_ERROR) Serial.println("Auth Failed");
+		else if (error == OTA_BEGIN_ERROR) Serial.println("Begin Failed");
+		else if (error == OTA_CONNECT_ERROR) Serial.println("Connect Failed");
+		else if (error == OTA_RECEIVE_ERROR) Serial.println("Receive Failed");
+		else if (error == OTA_END_ERROR) Serial.println("End Failed");
+	});
+
+	ArduinoOTA.begin();
 }
 
 void callback(char* topic, byte* payload, unsigned int length) {
-	unsigned long now = millis();
-	Serial.print("Message arrived [");
-	for (int i = 0; i < length; i++) {
-		Serial.print((char)payload[i]);
-	}
-	Serial.print("] now: ");
-	Serial.print(now);
-	Serial.print(" last_message: ");
-	Serial.print(last_message);
-	Serial.println();
+	char buf[50] = "";
 
-	if (last_message == 0) {
-		Serial.println("first message");
-		wink();
-		return;
+	for (unsigned int i = 0; i < length; i++) {
+		buf[i] = payload[i];
 	}
 
-	if (now - TIMEOUT_MS > last_message) {
-		Serial.println("new message");
+	String message(buf);
+	Serial.println("Message arrived: " + message);
+
+	if (message == "open") {
 		wink();
 	}
 }
@@ -68,7 +86,7 @@ void reconnect() {
 			Serial.println("connected");
 			// Once connected, publish an announcement...
 			// ... and resubscribe
-			client.subscribe("revspace/winkcat");
+			client.subscribe("revspace/state");
 		} else {
 			Serial.print("failed, rc=");
 			Serial.print(client.state());
@@ -83,6 +101,7 @@ void reconnect() {
 void setup() {
 	myservo.attach(D3);
 	myservo.write(90);
+	myservo.detach();
 
 	Serial.begin(115200);
 	setup_wifi();
@@ -93,7 +112,7 @@ void setup() {
 
 void wink() {
 	Serial.println("Wink!");
-	// Stop position
+	myservo.attach(D3);
 	myservo.write(90);
 	delay(500);
 	// Wink position
@@ -109,12 +128,14 @@ void wink() {
 	}
 	delay(1000);
 	Serial.println("Stopped winking!");
-	last_message = millis();
+	myservo.detach();
 }
 
 void loop() {
 	if (!client.connected()) {
 		reconnect();
 	}
+
+	ArduinoOTA.handle();
 	client.loop();
 }
