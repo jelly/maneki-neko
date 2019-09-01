@@ -52,3 +52,9 @@ Mkfile.old
 dkms.conf
 .pioenvs
 .piolibdeps
+
+# PlatformIO
+**/.pio
+
+# Secrets
+OTA_PASSWORD.h

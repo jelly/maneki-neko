@@ -5,6 +5,7 @@
 #include <WiFiUdp.h>
 #include <WiFiClient.h>
 #include <ArduinoOTA.h>
+#include "OTA_PASSWORD.h"
 #include <PubSubClient.h>
 #include <PubSubClient.h>
 
@@ -35,7 +36,7 @@ void setup_wifi() {
 	Serial.println(WiFi.localIP());
 
 	ArduinoOTA.setHostname("maneki-neko");
-	ArduinoOTA.setPassword("miauw");
+	ArduinoOTA.setPassword(OTA_PASSWORD);
 
 	ArduinoOTA.onStart([]() {
 		Serial.println("Start");
